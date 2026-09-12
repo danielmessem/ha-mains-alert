@@ -13,7 +13,7 @@ from flask import Flask, jsonify, request, send_file
 
 from detector import MainsDetector
 
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.1.1"
 DATA_DIR = Path("/data")
 SETTINGS_FILE = DATA_DIR / "settings.json"
 EVENTS_FILE = DATA_DIR / "events.json"
@@ -210,4 +210,3 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     threading.Thread(target=monitor, daemon=True).start()
     app.run(host="0.0.0.0", port=8099, threaded=True)
-
