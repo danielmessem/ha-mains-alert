@@ -1,5 +1,5 @@
 name: Mains Power Alert
-version: "0.1.0"
+version: "0.1.1"
 slug: mains_power_alert
 description: Configure and send mobile alerts when mains power fails or returns
 url: https://github.com/danielmessem/ha-mains-alert
@@ -22,4 +22,3 @@ map:
   - addon_config:rw
 options: {}
 schema: {}
-
