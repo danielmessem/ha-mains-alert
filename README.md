@@ -1,3 +1,4 @@
+# HA Mains Alert
 
 A Home Assistant add-on that detects mains failure and restoration and sends notifications to multiple Companion App devices.
 
