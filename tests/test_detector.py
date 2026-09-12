@@ -1,5 +1,6 @@
 import unittest
 from mains_alert.detector import MainsDetector
+from mains_alert.discovery import mobile_notify_services, rank_mains_entities
 
 
 class DetectorTests(unittest.TestCase):
@@ -30,6 +31,19 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(d.update("unavailable", 1, cfg).event, "off")
 
 
+class DiscoveryTests(unittest.TestCase):
+    def test_grid_voltage_beats_pv_and_battery(self):
+        states = [
+            {"entity_id": "sensor.deye_pv_voltage", "state": "320", "attributes": {"friendly_name": "Deye PV Voltage", "unit_of_measurement": "V"}},
+            {"entity_id": "sensor.deye_battery_voltage", "state": "52", "attributes": {"friendly_name": "Battery voltage", "unit_of_measurement": "V"}},
+            {"entity_id": "sensor.deye_grid_voltage", "state": "231", "attributes": {"friendly_name": "Deye Grid Voltage", "unit_of_measurement": "V"}},
+        ]
+        self.assertEqual(rank_mains_entities(states)[0]["entity_id"], "sensor.deye_grid_voltage")
+
+    def test_only_mobile_notify_services_are_returned(self):
+        services = [{"domain": "notify", "services": {"mobile_app_dan": {}, "persistent_notification": {}, "mobile_app_guest": {}}}]
+        self.assertEqual(mobile_notify_services(services), ["notify.mobile_app_dan", "notify.mobile_app_guest"])
+
+
 if __name__ == "__main__":
     unittest.main()
-
