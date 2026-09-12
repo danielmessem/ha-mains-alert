@@ -12,8 +12,9 @@ import requests
 from flask import Flask, jsonify, request, send_file
 
 from detector import MainsDetector
+from discovery import mobile_notify_services, rank_mains_entities
 
-APP_VERSION = "0.1.1"
+APP_VERSION = "0.2.0"
 DATA_DIR = Path("/data")
 SETTINGS_FILE = DATA_DIR / "settings.json"
 EVENTS_FILE = DATA_DIR / "events.json"
@@ -42,6 +43,7 @@ lock = threading.RLock()
 detector = MainsDetector()
 started_at = time.time()
 latest = {"state": None, "value": None, "attributes": {}, "error": None, "checked_at": None}
+latest_discovery = {"ran_at": None, "candidates": [], "notify_services": [], "recommendation": None}
 events = deque(maxlen=200)
 
 
@@ -152,11 +154,32 @@ def discover():
                      "name": x.get("attributes", {}).get("friendly_name", x["entity_id"]),
                      "unit": x.get("attributes", {}).get("unit_of_measurement", "")}
                     for x in states]
-        notify_services = []
-        for domain in services:
-            if domain.get("domain") == "notify":
-                notify_services = [f"notify.{name}" for name in domain.get("services", {}) if name.startswith("mobile_app_")]
-        return jsonify({"entities": entities, "notify_services": sorted(notify_services)})
+        return jsonify({"entities": entities, "notify_services": mobile_notify_services(services)})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
+
+
+@app.post("/api/auto-configure")
+def auto_configure():
+    global latest_discovery
+    try:
+        states = ha_get("/api/states")
+        services = ha_get("/api/services")
+        candidates = rank_mains_entities(states)
+        phones = mobile_notify_services(services)
+        best = candidates[0] if candidates else None
+        recommended = {
+            "entity_id": best["entity_id"] if best else "",
+            "attribute": "",
+            "mode": "numeric" if best and str(best.get("unit", "")).lower() in ("v", "volt", "volts") else "state",
+            "notify_services": phones[:2],
+        }
+        latest_discovery = {"ran_at": utcnow(), "entities_scanned": len(states),
+                            "candidates": candidates, "notify_services": phones,
+                            "recommendation": recommended}
+        add_event("discovery", f"Scanned {len(states)} entities; found {len(candidates)} mains candidates and {len(phones)} mobile targets",
+                  {"recommended_entity": recommended["entity_id"], "recommended_targets": recommended["notify_services"]})
+        return jsonify(latest_discovery)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 502
 
@@ -201,6 +224,7 @@ def diagnostics():
         "configuration": cfg,
         "runtime": {"detector_status": detector.status, "uptime_seconds": int(time.time() - started_at)},
         "selected_entity": latest,
+        "last_discovery": latest_discovery,
         "recent_events": list(events)[:30]
     }
     return app.response_class(json.dumps(report, indent=2, default=str), mimetype="text/plain")
